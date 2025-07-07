@@ -46,15 +46,12 @@ This project is an autonomous 4-wheel robot that detects and avoids obstacles us
 
 ---
 
-## 📁 Optional Extensions
 
-- Add Bluetooth module for manual control  
-- Integrate IR sensors for edge detection or line-following  
-- Use an OLED/LCD display to show distance or status
+```💰 You can help me by Donating```
 
----
+[![BuyMeACoffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/rohankini) [![PayPal](https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/RohanKinirk) 
 
-## 🛠️ License
 
-This project is open-source and free to use under the [MIT License](LICENSE).
+
+
 
