@@ -1,77 +1,54 @@
 #include <AFMotor.h>
 #include <Servo.h>
 
-// Pin definitions for ultrasonic sensor
 #define ECHO_PIN A4
 #define TRIG_PIN A5
 
-// Motor setup
+Servo myservo;
+
 AF_DCMotor motor1(1, MOTOR12_64KHZ);
 AF_DCMotor motor2(2, MOTOR12_64KHZ);
 AF_DCMotor motor3(3, MOTOR12_64KHZ);
 AF_DCMotor motor4(4, MOTOR12_64KHZ);
 
-// Servo object
-Servo myServo;
+const int THRESHOLD_DISTANCE = 20; // Distance threshold in cm
+long distance_F, distance_L, distance_R;
 
-// Distance variables
-int distanceLeft = 0, distanceFront = 0, distanceRight = 0;
-const int safeDistance = 20;  // Minimum safe distance in cm
-
-//===============================================================================
-//  Initialization
-//===============================================================================
 void setup() {
   Serial.begin(9600);
-  Serial.println("Robot Starting...");
+  Serial.println("System Initialized");
 
-  myServo.attach(10);
-  myServo.write(90); // Center position
+  myservo.attach(10);
+  myservo.write(90); // Face forward
 
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
 
-  // Set motor speed (0-255)
-  motor1.setSpeed(180);
-  motor2.setSpeed(180);
-  motor3.setSpeed(180);
-  motor4.setSpeed(180);
+  // Set initial speed
+  setMotorSpeed(180);
 }
 
-//===============================================================================
-//  Main Loop
-//===============================================================================
 void loop() {
-  distanceFront = measureDistance();
+  distance_F = getDistance();
+  Serial.print("Front Distance: ");
+  Serial.println(distance_F);
 
-  Serial.print("Front Distance = ");
-  Serial.println(distanceFront);
-
-  if (distanceFront > safeDistance) {
+  if (distance_F > THRESHOLD_DISTANCE) {
     moveForward();
   } else {
     stopMotors();
-    scanAndAvoid();
+    scanSidesAndReact();
   }
 }
 
-//===============================================================================
-//  Measure Distance using Ultrasonic Sensor
-//===============================================================================
-int measureDistance() {
-  digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(2);
-  digitalWrite(TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(TRIG_PIN, LOW);
-
-  long duration = pulseIn(ECHO_PIN, HIGH);
-  return duration / 29 / 2; // Convert to cm
+//================= Motor Helpers ===================
+void setMotorSpeed(int speed) {
+  motor1.setSpeed(speed);
+  motor2.setSpeed(speed);
+  motor3.setSpeed(speed);
+  motor4.setSpeed(speed);
 }
 
-//===============================================================================
-//  Motor Control Functions
-//===============================================================================
 void moveForward() {
   Serial.println("Moving Forward");
   motor1.run(FORWARD);
@@ -87,20 +64,6 @@ void moveBackward() {
   motor4.run(BACKWARD);
 }
 
-void turnLeft() {
-  motor1.run(BACKWARD);
-  motor2.run(BACKWARD);
-  motor3.run(FORWARD);
-  motor4.run(FORWARD);
-}
-
-void turnRight() {
-  motor1.run(FORWARD);
-  motor2.run(FORWARD);
-  motor3.run(BACKWARD);
-  motor4.run(BACKWARD);
-}
-
 void stopMotors() {
   Serial.println("Stopping");
   motor1.run(RELEASE);
@@ -109,46 +72,71 @@ void stopMotors() {
   motor4.run(RELEASE);
 }
 
-//===============================================================================
-//  Scan Environment using Servo + Sensor
-//===============================================================================
-void scanAndAvoid() {
-  // Look Right
-  myServo.write(0);
-  delay(300);
-  distanceRight = measureDistance();
+//================= Distance Sensor ===================
+long getDistance() {
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(5);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
 
-  // Look Left
-  myServo.write(170);
-  delay(500);
-  distanceLeft = measureDistance();
-
-  // Return to center
-  myServo.write(90);
-  delay(300);
-
-  compareDistances();
+  long duration = pulseIn(ECHO_PIN, HIGH, 25000); // 25ms timeout (~4m)
+  if (duration == 0) return 999; // No echo received
+  return duration / 58.2; // Convert to cm
 }
 
-//===============================================================================
-//  Compare Left and Right Distances and Act
-//===============================================================================
-void compareDistances() {
-  if (distanceLeft > distanceRight) {
+//================= Scanning ===================
+void scanSidesAndReact() {
+  Serial.println("Scanning...");
+
+  myservo.write(20); // Look right
+  delay(500);
+  distance_R = getDistance();
+  Serial.print("Right: ");
+  Serial.println(distance_R);
+
+  myservo.write(160); // Look left
+  delay(500);
+  distance_L = getDistance();
+  Serial.print("Left: ");
+  Serial.println(distance_L);
+
+  myservo.write(90); // Center
+  delay(300);
+
+  decideDirection();
+}
+
+//================= Decision Making ===================
+void decideDirection() {
+  if (distance_L > distance_R && distance_L > THRESHOLD_DISTANCE) {
     Serial.println("Turning Left");
     turnLeft();
-    delay(350);
-  } else if (distanceRight > distanceLeft) {
+  } else if (distance_R > distance_L && distance_R > THRESHOLD_DISTANCE) {
     Serial.println("Turning Right");
     turnRight();
-    delay(350);
   } else {
-    Serial.println("Backing Up and Turning Left");
+    Serial.println("Reversing");
     moveBackward();
-    delay(300);
-    turnLeft();
     delay(500);
+    turnLeft(); // Default to left
   }
+}
 
-  stopMotors();  // Optional: stop after maneuver
+void turnLeft() {
+  motor1.run(BACKWARD);
+  motor2.run(BACKWARD);
+  motor3.run(FORWARD);
+  motor4.run(FORWARD);
+  delay(400);
+  stopMotors();
+}
+
+void turnRight() {
+  motor1.run(FORWARD);
+  motor2.run(FORWARD);
+  motor3.run(BACKWARD);
+  motor4.run(BACKWARD);
+  delay(400);
+  stopMotors();
 }
